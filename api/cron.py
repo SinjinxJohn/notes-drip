@@ -12,7 +12,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 def get_random_snippet():
     # Looks for tech_notes.md in the root directory
-    file_path = os.path.join(os.path.dirname(__file__), "..", "tech_notes.md")
+    file_path = os.path.join(os.path.dirname(__file__), "..", "tech-notes.md")
     if not os.path.exists(file_path):
         return None
 
