@@ -14,7 +14,7 @@ app = FastAPI()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.6-flash")
 
 
 
@@ -49,26 +49,31 @@ async def summarize_with_gemini(client: httpx.AsyncClient, snippet: str) -> str:
         "Authorization": f"Bearer {GEMINI_API_KEY}",
         "Content-Type": "application/json",
     }
-    prompt = f"""You are a Staff Software Architect teaching backend engineering best practices.
-Excerpt from technical notes:
+    prompt = f"""You are a Principal Backend & Distributed Systems Architect.
+Below is an excerpt from engineering notes on high-scale systems (Order Management System, Spring Boot/JPA, Concurrency, Kafka):
 \"\"\"{snippet}\"\"\"
 
-Deliver a crisp, senior-level breakdown formatted in exactly 5 to 10 lines:
+Provide a detailed, high-signal technical lesson with rich explanations:
 
-📌 Concept: [1-2 lines explaining the underlying system design or database concept]
-⚙️ Production Scenario: [3-4 lines with a realistic, high-traffic engineering example: describe what breaks under scale without this, and the exact production fix (mention real technical components like MySQL locks, JVM memory, Kafka offsets, Spring @Version, etc.)]
-💡 Key Gotcha: [1-2 lines with the exact implementation pitfall to avoid or golden rule to follow]
+📌 **Architecture & Core Concept**:
+Explain the underlying concept, system design principle, and why this design choice exists in depth (3-4 sentences).
+
+⚙️ **Production Scenario & Deep Dive**:
+Walk through a concrete, high-traffic production scenario. Explain what breaks under scale without this pattern (e.g., database row locking, JVM heap memory explosion, Kafka consumer offset lag, race conditions), and detail step-by-step how this solution resolves it (4-6 sentences).
+
+💡 **Key Takeaways & Production Gotchas**:
+Provide the exact rules of thumb, edge cases, and architectural mistakes to avoid when implementing this in enterprise code (2-3 sentences).
 
 Rules:
-- Output length must be between 5 and 10 lines total.
-- The scenario must be a concrete, realistic production case (not vague analogies).
-- No greetings, intro phrases, or filler text."""
+- Be thorough, highly technical, and practical.
+- Do not cut the explanation short. Provide complete, insightful sentences.
+- Avoid generic intro fluff (no "Welcome to today's lesson"). Jump straight into the breakdown."""
 
     payload = {
         "model": GEMINI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.4,
-        "max_tokens": 500,
+        "max_tokens": 4000,
     }
 
     res = await client.post(url, headers=headers, json=payload, timeout=25.0)
