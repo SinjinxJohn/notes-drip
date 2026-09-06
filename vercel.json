@@ -1,4 +1,10 @@
 {
+  "functions": {
+    "api/**/*.py": {
+      "maxDuration": 60,
+      "includeFiles": "tech-notes.md"
+    }
+  },
   "crons": [
     {
       "path": "/api/cron",

@@ -2,8 +2,12 @@ import os
 import random
 import html
 import httpx
-from fastapi import FastAPI, HTTPException, Header, Depends, status
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import PlainTextResponse
+
+# Load .env for local testing
+load_dotenv()
 
 app = FastAPI()
 
@@ -13,17 +17,19 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 
 
-
-
 def get_random_snippet() -> str | None:
-    file_path = os.path.join(os.path.dirname(__file__), "..", "tech-notes.md")
-    if not os.path.exists(file_path):
+    # Check both relative to file and project root for Vercel compatibility
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), "..", "tech-notes.md"),
+        os.path.join(os.getcwd(), "tech-notes.md"),
+    ]
+    file_path = next((p for p in possible_paths if os.path.exists(p)), None)
+    if not file_path:
         return None
 
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # Split by paragraphs instead of arbitrary individual lines
     blocks = [
         block.strip()
         for block in content.split("\n\n")
@@ -36,7 +42,7 @@ def get_random_snippet() -> str | None:
 
 
 async def summarize_with_groq(client: httpx.AsyncClient, snippet: str) -> str:
-    url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
+    url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json",
@@ -62,8 +68,7 @@ Keep the total output under 70 words. No intro or conversational filler."""
 
 
 async def send_telegram(client: httpx.AsyncClient, text: str):
-    url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_BOT_TOKEN}/sendMessage"
-    # HTML mode avoids broken message delivery caused by unescaped Markdown symbols
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     escaped_text = html.escape(text)
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -74,11 +79,24 @@ async def send_telegram(client: httpx.AsyncClient, text: str):
     res.raise_for_status()
 
 
-@app.get(
-    "/api/cron",
-    response_class=PlainTextResponse
-)
+@app.get("/api/cron", response_class=PlainTextResponse)
+@app.get("/", response_class=PlainTextResponse)
 async def run_cron():
+
+    # Validate required environment variables
+    missing_vars = [
+        var for var, val in [
+            ("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN),
+            ("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID),
+            ("GROQ_API_KEY", GROQ_API_KEY),
+        ] if not val
+    ]
+    if missing_vars:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Missing required environment variables: {', '.join(missing_vars)}",
+        )
+
     snippet = get_random_snippet()
     if not snippet:
         raise HTTPException(status_code=404, detail="No valid snippets found in tech-notes.md")
