@@ -30,7 +30,7 @@ def get_random_snippet():
     return random.choice(lines)
 
 def summarize_with_groq(snippet):
-    url = "[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)"
+    url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -56,7 +56,7 @@ Keep the total output under 70 words. No intro or conversational filler.
     return res.json()["choices"][0]["message"]["content"].strip()
 
 def send_telegram(text):
-    url = f"[https://api.telegram.org/bot](https://api.telegram.org/bot){TELEGRAM_BOT_TOKEN}/sendMessage"
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
         "text": f"💡 *Daily Tech Note Drip*\n\n{text}",
