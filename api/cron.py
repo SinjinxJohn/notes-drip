@@ -49,19 +49,22 @@ async def summarize_with_gemini(client: httpx.AsyncClient, snippet: str) -> str:
         "Authorization": f"Bearer {GEMINI_API_KEY}",
         "Content-Type": "application/json",
     }
-    prompt = f"""You are an expert daily learning coach.
-Excerpt from user's tech notes:
+    prompt = f"""You are an expert technical mentor delivering a daily bite-sized lesson.
+Excerpt from user's technical notes:
 \"\"\"{snippet}\"\"\"
 
-1. Explain this concept in 1-2 sharp, clear sentences.
-2. Provide 1 practical real-world or software engineering example.
-Keep the total output under 70 words. No intro or conversational filler."""
+Provide a high-value, structured breakdown between 100 and 200 words:
+1. 🧠 Core Concept: Explain the core architectural or engineering concept clearly and precisely.
+2. 🛠 Real-World / Production Example: Give a concrete scenario or codebase example showing why this matters in production.
+3. ⚠️ Key Takeaway / Pitfall: One important rule of thumb or mistake to avoid.
+
+Keep the total response between 100 and 200 words. Do not include conversational filler."""
 
     payload = {
         "model": GEMINI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4,
-        "max_tokens": 400,
+        "temperature": 0.5,
+        "max_tokens": 600,
     }
 
     res = await client.post(url, headers=headers, json=payload, timeout=25.0)
