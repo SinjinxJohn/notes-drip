@@ -73,7 +73,7 @@ Rules:
         "model": GEMINI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.4,
-        "max_tokens": 4000,
+        "max_tokens": 1000,
     }
 
     res = await client.post(url, headers=headers, json=payload, timeout=25.0)
@@ -91,14 +91,51 @@ Rules:
 
 async def send_telegram(client: httpx.AsyncClient, text: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    header_prefix = "💡 <b>Daily Tech Note Drip</b>\n\n"
     escaped_text = html.escape(text)
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": f"💡 <b>Daily Tech Note Drip</b>\n\n{escaped_text}",
-        "parse_mode": "HTML",
-    }
-    res = await client.post(url, json=payload, timeout=15.0)
-    res.raise_for_status()
+    full_text = header_prefix + escaped_text
+
+    # Telegram limit is 4096 chars. If under 4000 chars, send in 1 bubble
+    if len(full_text) <= 4000:
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": full_text,
+            "parse_mode": "HTML",
+        }
+        res = await client.post(url, json=payload, timeout=15.0)
+        res.raise_for_status()
+        return
+
+    # If longer than 4000 chars, chunk safely across multiple bubbles.
+    # The first bubble gets the header; subsequent bubbles do NOT.
+    chunks = []
+    current_chunk = ""
+    is_first_chunk = True
+
+    for para in text.split("\n\n"):
+        escaped_para = html.escape(para)
+        limit = 3800 if is_first_chunk else 3900
+
+        if len(current_chunk) + len(escaped_para) + 2 > limit and current_chunk:
+            formatted_chunk = (header_prefix + current_chunk) if is_first_chunk else current_chunk
+            chunks.append(formatted_chunk.strip())
+            current_chunk = escaped_para
+            is_first_chunk = False
+        else:
+            current_chunk += ("\n\n" if current_chunk else "") + escaped_para
+
+    if current_chunk.strip():
+        formatted_chunk = (header_prefix + current_chunk) if is_first_chunk else current_chunk
+        chunks.append(formatted_chunk.strip())
+
+    for chunk in chunks:
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": chunk,
+            "parse_mode": "HTML",
+        }
+        res = await client.post(url, json=payload, timeout=15.0)
+        res.raise_for_status()
 
 
 @app.get("/")
