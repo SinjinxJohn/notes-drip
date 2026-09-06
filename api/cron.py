@@ -1,14 +1,17 @@
 import os
 import random
 import requests
-from http.server import BaseHTTPRequestHandler
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import PlainTextResponse
+
+app = FastAPI()
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 def get_random_snippet():
-    # Read the markdown file bundled in the project root
+    # Looks for tech_notes.md in the root directory
     file_path = os.path.join(os.path.dirname(__file__), "..", "tech_notes.md")
     if not os.path.exists(file_path):
         return None
@@ -16,7 +19,6 @@ def get_random_snippet():
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
 
-    # Filter for meaningful bullet points, sentences, or sections (> 40 chars)
     lines = [
         line.strip() 
         for line in content.split("\n") 
@@ -62,24 +64,15 @@ def send_telegram(text):
     }
     requests.post(url, json=payload, timeout=15)
 
-class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        snippet = get_random_snippet()
-        if not snippet:
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"No notes found")
-            return
+@app.get("/api/cron", response_class=PlainTextResponse)
+def run_cron():
+    snippet = get_random_snippet()
+    if not snippet:
+        raise HTTPException(status_code=404, detail="No notes found in tech_notes.md")
 
-        try:
-            summary = summarize_with_groq(snippet)
-            send_telegram(summary)
-            
-            self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
-            self.end_headers()
-            self.wfile.write(b"Drip sent successfully!")
-        except Exception as e:
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Error: {e}".encode())
+    try:
+        summary = summarize_with_groq(snippet)
+        send_telegram(summary)
+        return "Drip sent successfully!"
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
