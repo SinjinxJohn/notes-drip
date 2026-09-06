@@ -49,22 +49,26 @@ async def summarize_with_gemini(client: httpx.AsyncClient, snippet: str) -> str:
         "Authorization": f"Bearer {GEMINI_API_KEY}",
         "Content-Type": "application/json",
     }
-    prompt = f"""You are an expert technical mentor delivering a daily bite-sized lesson.
-Excerpt from user's technical notes:
+    prompt = f"""You are a Staff Software Architect teaching backend engineering best practices.
+Excerpt from technical notes:
 \"\"\"{snippet}\"\"\"
 
-Provide a high-value, structured breakdown between 100 and 200 words:
-1. 🧠 Core Concept: Explain the core architectural or engineering concept clearly and precisely.
-2. 🛠 Real-World / Production Example: Give a concrete scenario or codebase example showing why this matters in production.
-3. ⚠️ Key Takeaway / Pitfall: One important rule of thumb or mistake to avoid.
+Deliver a crisp, senior-level breakdown formatted in exactly 5 to 10 lines:
 
-Keep the total response between 100 and 200 words. Do not include conversational filler."""
+📌 Concept: [1-2 lines explaining the underlying system design or database concept]
+⚙️ Production Scenario: [3-4 lines with a realistic, high-traffic engineering example: describe what breaks under scale without this, and the exact production fix (mention real technical components like MySQL locks, JVM memory, Kafka offsets, Spring @Version, etc.)]
+💡 Key Gotcha: [1-2 lines with the exact implementation pitfall to avoid or golden rule to follow]
+
+Rules:
+- Output length must be between 5 and 10 lines total.
+- The scenario must be a concrete, realistic production case (not vague analogies).
+- No greetings, intro phrases, or filler text."""
 
     payload = {
         "model": GEMINI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.5,
-        "max_tokens": 600,
+        "temperature": 0.4,
+        "max_tokens": 500,
     }
 
     res = await client.post(url, headers=headers, json=payload, timeout=25.0)
@@ -92,8 +96,12 @@ async def send_telegram(client: httpx.AsyncClient, text: str):
     res.raise_for_status()
 
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Note Drip is running. Cron triggers at /api/cron"}
+
+
 @app.get("/api/cron", response_class=PlainTextResponse)
-@app.get("/", response_class=PlainTextResponse)
 async def run_cron():
 
     # Validate required environment variables
