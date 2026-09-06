@@ -10,17 +10,9 @@ app = FastAPI()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-CRON_SECRET = os.environ.get("CRON_SECRET")
 
 
-def verify_cron_secret(authorization: str = Header(None)):
-    if not CRON_SECRET:
-        return True
-    if not authorization or authorization != f"Bearer {CRON_SECRET}":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-        )
+
 
 
 def get_random_snippet() -> str | None:
@@ -84,8 +76,7 @@ async def send_telegram(client: httpx.AsyncClient, text: str):
 
 @app.get(
     "/api/cron",
-    response_class=PlainTextResponse,
-    dependencies=[Depends(verify_cron_secret)],
+    response_class=PlainTextResponse
 )
 async def run_cron():
     snippet = get_random_snippet()
