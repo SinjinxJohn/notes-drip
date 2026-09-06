@@ -13,8 +13,8 @@ app = FastAPI()
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 
 
 
@@ -42,10 +42,11 @@ def get_random_snippet() -> str | None:
     return random.choice(blocks)
 
 
-async def summarize_with_groq(client: httpx.AsyncClient, snippet: str) -> str:
-    url = "https://api.groq.com/openai/v1/chat/completions"
+async def summarize_with_gemini(client: httpx.AsyncClient, snippet: str) -> str:
+    # Google AI Studio OpenAI-compatible endpoint
+    url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Authorization": f"Bearer {GEMINI_API_KEY}",
         "Content-Type": "application/json",
     }
     prompt = f"""You are an expert daily learning coach.
@@ -57,15 +58,23 @@ Excerpt from user's tech notes:
 Keep the total output under 70 words. No intro or conversational filler."""
 
     payload = {
-        "model": GROQ_MODEL,
+        "model": GEMINI_MODEL,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.4,
-        "max_tokens": 150,
+        "max_tokens": 400,
     }
 
-    res = await client.post(url, headers=headers, json=payload, timeout=20.0)
+    res = await client.post(url, headers=headers, json=payload, timeout=25.0)
     res.raise_for_status()
-    return res.json()["choices"][0]["message"]["content"].strip()
+    data = res.json()
+    message = data.get("choices", [{}])[0].get("message", {})
+    content = message.get("content") or ""
+
+    if not content.strip():
+        # Fallback to direct excerpt if model produced empty output
+        content = snippet[:350]
+
+    return content.strip()
 
 
 async def send_telegram(client: httpx.AsyncClient, text: str):
@@ -89,7 +98,7 @@ async def run_cron():
         var for var, val in [
             ("TELEGRAM_BOT_TOKEN", TELEGRAM_BOT_TOKEN),
             ("TELEGRAM_CHAT_ID", TELEGRAM_CHAT_ID),
-            ("GROQ_API_KEY", GROQ_API_KEY),
+            ("GEMINI_API_KEY", GEMINI_API_KEY),
         ] if not val
     ]
     if missing_vars:
@@ -104,7 +113,7 @@ async def run_cron():
 
     async with httpx.AsyncClient() as client:
         try:
-            summary = await summarize_with_groq(client, snippet)
+            summary = await summarize_with_gemini(client, snippet)
             await send_telegram(client, summary)
             return "Drip sent successfully!"
         except httpx.HTTPStatusError as e:
